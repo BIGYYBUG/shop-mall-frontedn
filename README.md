@@ -66,11 +66,14 @@ src/
 │  └─ ProductFormDrawer.vue  商品表单抽屉（卖家端/管理端共用）
 ├─ constants/category.js     商品分类字典（后端暂无分类接口的兜底）
 ├─ stores/user.js            token / userInfo / roles / hasRole()
+├─ stores/cart.js            购物车角标数（商品种类数）
 ├─ views/
 │  ├─ Home.vue               首页（商品列表，免登录）
 │  ├─ Login.vue              登录
+│  ├─ Register.vue           注册（成功后自动登录并回跳）
 │  ├─ OauthCallback.vue      第三方登录回调
-│  ├─ ProductDetail.vue      商品详情（免登录）
+│  ├─ ProductDetail.vue      商品详情（免登录，可加入购物车）
+│  ├─ Cart.vue               购物车（登录：改量 / 勾选 / 合计 / 删除）
 │  ├─ admin/                 UserManage / RoleManage / ShopManage / ProductManage
 │  └─ seller/                MyShop / MyProducts
 ├─ assets/base.css           设计变量与全局基础样式
@@ -82,8 +85,9 @@ src/
 | 路由 | 页面 | 访问要求 |
 |---|---|---|
 | `/` | 首页 · 商品列表 | 免登录 |
-| `/products/:id` | 商品详情 | 免登录 |
-| `/login`、`/oauth/callback` | 登录、授权回调 | 免登录（隐藏公共布局） |
+| `/products/:id` | 商品详情（可加入购物车） | 免登录 |
+| `/cart` | 购物车 | **登录**（后端 `/cart/**` 不放行） |
+| `/login`、`/register`、`/oauth/callback` | 登录、注册、授权回调 | 免登录（隐藏公共布局） |
 | `/seller/shop` | 我的店铺 | 登录（**刻意不设角色**，未入驻也要能申请） |
 | `/seller/products` | 我的商品 | `SELLER` |
 | `/admin/users`、`/admin/roles`、`/admin/shops`、`/admin/products` | 管理后台 | `ADMIN` |
@@ -148,7 +152,7 @@ src/
 
 角标数放在 `stores/cart.js`，只存**种类数**（与后端 `CartVO.totalCount` 口径一致）。商品详情页加购成功后直接 `setCount(cart.totalCount)`，头部角标立刻变化，**不需要额外请求，也不需要事件总线**。
 
-> ⚠️ 「删除选中」后端目前**没有批量接口**，`Cart.vue` 按顺序逐个调用。购物车规模小（单用户几十行量级）时串行可接受，且串行能让最后一次响应覆盖中间态。上百行后应推进后端补 `DELETE /cart/items/batch`。
+> 「删除选中」走的是后端的 `DELETE /cart/items/batch?productIds=1,2,3`：参数放 **query** 而非 body（DELETE 带 body 是未定义行为，网关可能直接丢掉），且数组要手动 `join(',')` —— axios 默认序列化成 `productIds[]=1&...`，后端 `List<Long>` 未必接得住。
 
 ## 7. 设计系统
 
@@ -169,9 +173,12 @@ src/
 |---|---|
 | 无 `permissions` 下发 | `/user/info` 只给 `roles`，无法按权限码控制按钮，当前按角色控制 |
 | 无分类接口 | `categoryId` 是裸 ID，分类下拉用 `constants/category.js` 的常量兜底 |
-| 购物车 / 订单 | 后端未实现，详情页按钮置灰并标注"功能开发中" |
+| **订单页缺失** | 后端 `OrderService` 仍是占位；购物车「去结算」与详情页「立即购买」保持置灰，不做假按钮 |
+| 「记住我」是摆设 | 勾没勾都会把 token 写进 `localStorage`。真要区分得把未勾选时改成 `sessionStorage`，会牵动 `request.js` + `stores/user.js`，暂未动 |
 | 商品 URL ↔ Key | 编辑回显后提交需转换，当前采用"未换图不提交"兜底 |
 | 上传模式 | 当前是后端中转（浏览器→应用→OSS），生产改前端直传后 `api/file.js` 调用方式会变 |
+
+> ✅ 早前记录的**三处「静默」缺陷已修**：登录 `redirect` 现在生效、第三方登录按钮已渲染（此前只写了 CSS 没写模板）、`/register` 注册页与路由已补（此前 `Login.vue` 里的「立即注册」链接指向一个不存在的路由，点下去静默跳回首页）。
 
 ## 9. 后端接口交接文档
 

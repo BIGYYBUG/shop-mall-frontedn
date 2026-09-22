@@ -42,6 +42,8 @@
       <section class="form-area">
         <h2 class="form-title">账号登录</h2>
 
+        <p v-if="registeredHint" class="ok-text">注册成功，请使用新账号登录</p>
+
         <form @submit.prevent="handleSubmit">
           <div class="field">
             <label for="username">用户名 / 手机号</label>
@@ -91,6 +93,34 @@
           </button>
         </form>
 
+        <!-- 第三方登录：渠道由后端 /auth/sources 决定，未配置 AppID 时返回 []，整块不渲染。
+             这里以前只写了 .social-btn 的样式却没有模板，所以按钮"存在但永远看不见" -->
+        <template v-if="socialSources.length">
+          <div class="divider">其他登录方式</div>
+          <button
+            v-for="s in socialSources"
+            :key="s"
+            type="button"
+            class="social-btn"
+            :disabled="loading"
+            @click="handleSocialLogin(s)"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
+              <circle cx="9.4" cy="10.3" r="1" fill="currentColor" />
+              <circle cx="14.6" cy="10.3" r="1" fill="currentColor" />
+              <path
+                d="M8.6 13.6c1 1.1 2.1 1.7 3.4 1.7s2.4-.6 3.4-1.7"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+              />
+            </svg>
+            {{ sourceName(s) }}
+          </button>
+        </template>
+
         <p class="foot-tip">
           还没有账号？
           <router-link class="link" to="/register">立即注册</router-link>
@@ -101,13 +131,29 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { listSocialSources, getAuthorizeUrl, createState } from '../api/social'
 
+const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+/**
+ * 登录成功后的落点。
+ *
+ * 只接受**站内**路径：不校验的话 `?redirect=https://evil.com` 就是一个开放重定向，
+ * 钓鱼站会拿它当跳板（"你看域名是 mall 的"）。
+ * 再挡掉 `//evil.com` —— 浏览器会把协议相对 URL 当外部地址。
+ */
+const resolveRedirect = (redirect) =>
+  typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+    ? redirect
+    : '/'
+
+/** 从注册页跳回来时带 registered=1，提示一下 */
+const registeredHint = computed(() => route.query.registered === '1')
 
 const brandPoints = [
   {
@@ -212,7 +258,10 @@ const handleSubmit = async () => {
       username: form.username,
       password: form.password
     })
-    router.push('/')
+    // 回到用户原本想去的页面（如从商品详情页点"加入购物车"被弹过来的场景）。
+    // 以前这里写死 router.push('/')，redirect 参数收了却不用 —— 用户登录完
+    // 被丢回首页，得自己再找一遍刚才那件商品。
+    router.push(resolveRedirect(route.query.redirect))
   } catch (e) {
     serverError.value = e.message || '登录失败，请稍后重试'
   } finally {
@@ -414,6 +463,16 @@ const handleSubmit = async () => {
   font-size: 13px;
 }
 
+/* 注册成功提示：在表单上方，绿色区别于报错 */
+.ok-text {
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: #eaf7ec;
+  color: #1c7c34;
+  font-size: 13px;
+}
+
 .submit-btn {
   width: 100%;
   height: 44px;
@@ -482,6 +541,12 @@ const handleSubmit = async () => {
   border-color: #1aad19;
   background: #f7fdf7;
   transform: translateY(-1px);
+}
+
+.social-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .foot-tip {

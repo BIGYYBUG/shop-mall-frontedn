@@ -140,6 +140,7 @@ import {
   clearCart,
   getCart,
   removeCartItem,
+  removeCartItems,
   setCartSelected,
   updateCartQuantity
 } from '../api/cart'
@@ -235,13 +236,10 @@ const handleRemove = (item) =>
   run(() => removeCartItem(item.productId), '已移除')
 
 /**
- * 删除选中。
+ * 删除选中：一次请求删完。
  *
- * 后端目前只有「删单个」和「清空」两个接口，没有批量删除，
- * 所以这里按顺序逐个调用。
- * 购物车规模很小（单个用户几十行量级），串行几张请求可以接受，
- * 且串行能让最后一次响应的 CartVO 覆盖掉中间态，不会出现并发写乱序。
- * 若将来购物车能上百行，应改为后端提供 `DELETE /cart/items/batch`。
+ * 早先后端只有「删单个」和「清空」，这里只能循环调用 —— N 件商品就是 N 次往返，
+ * 且每次都会重复「删字段 + 版本 +1 + 置脏标记」。现已补上 `DELETE /cart/items/batch`。
  */
 const handleRemoveSelected = async () => {
   const ids = [...selectedIds.value]
@@ -255,13 +253,7 @@ const handleRemoveSelected = async () => {
   } catch {
     return // 用户取消
   }
-  await run(async () => {
-    let last = null
-    for (const id of ids) {
-      last = await removeCartItem(id)
-    }
-    return last
-  }, '已移除选中商品')
+  await run(() => removeCartItems(ids), '已移除选中商品')
 }
 
 const handleClear = async () => {

@@ -15,6 +15,14 @@ const routes = [
     meta: { hideLayout: true }
   },
   {
+    // 注册页：Login.vue 里一直有个「立即注册」链接指向 /register，
+    // 但这条路由此前不存在 —— 点下去会落到兜底规则、静默跳回首页（不报错，最难查）
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/Register.vue'),
+    meta: { hideLayout: true }
+  },
+  {
     // 第三方登录回调页：同样不显示公共布局，避免用户在授权跳转中看到半截页面
     path: '/oauth/callback',
     name: 'OauthCallback',

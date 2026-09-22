@@ -37,5 +37,22 @@ export const setCartSelected = (productIds, selected) =>
 export const removeCartItem = (productId) =>
   request({ url: `/cart/items/${productId}`, method: 'delete' })
 
+/**
+ * 批量移除（「删除选中」）。
+ *
+ * 两点注意：
+ *  ① 参数走 **query**，不走 body —— DELETE 带 body 属未定义行为，
+ *     部分网关/代理会直接把它丢掉，而且前端看不出异常。
+ *  ② 手动 `join(',')` 而**不是**直接传数组：axios 对数组默认序列化成
+ *     `productIds[]=1&productIds[]=2`，后端 `List<Long>` 未必接得住；
+ *     逗号串是 Spring 明确支持的绑定形式。
+ */
+export const removeCartItems = (productIds) =>
+  request({
+    url: '/cart/items/batch',
+    method: 'delete',
+    params: { productIds: productIds.join(',') }
+  })
+
 /** 清空购物车（返回 null，不是 CartVO —— 车都空了没什么可回） */
 export const clearCart = () => request({ url: '/cart/items', method: 'delete' })
