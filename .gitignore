@@ -38,3 +38,12 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# ---- Windows 保留名误建文件 ----
+# 起因：bash 下写 `2>nul` 时，nul 不会被当成设备，而是被当成普通文件名，
+# 于是仓库根目录被建出一个名为 NUL 的文件。它是 Windows 保留设备名，
+# 常规手段删不掉也改不了名（PowerShell / git clean 均报 Permission denied）。
+# 只能忽略；如需彻底清理，请用「管理员」cmd 执行：
+#   del "\\?\E:\Projects\shopping-mall-frontend\NUL"
+NUL
+nul
