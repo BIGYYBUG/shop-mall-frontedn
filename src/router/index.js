@@ -78,6 +78,16 @@ const routes = [
     component: () => import('../views/ProductDetail.vue')
   },
   {
+    // 购物车：必须登录。
+    // 浏览商品可以免登录（放行清单内），但购物车属于"我的数据"，
+    // 后端 /cart/** 不在放行清单里，无令牌直接 401 —— 这里提前拦一次，
+    // 避免用户点了链接才被弹到登录页。
+    path: '/cart',
+    name: 'Cart',
+    component: () => import('../views/Cart.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     // 兜底：未匹配到的路径回首页
     path: '/:pathMatch(.*)*',
     redirect: '/'

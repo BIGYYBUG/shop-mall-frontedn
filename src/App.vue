@@ -45,6 +45,30 @@
 
           <nav class="nav">
             <router-link to="/">首页</router-link>
+            <!-- 购物车入口：仅登录可见（后端 /cart/** 不放行，未登录进去也是 401）。
+                 角标数字来自 cart store，加购后由详情页/购物车页写入，无需刷新页面 -->
+            <router-link v-if="userStore.isLoggedIn" to="/cart" class="nav-cart">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M5 7h14l-1.2 13.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 7Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M8.5 9.5V6.5a3.5 3.5 0 0 1 7 0v3"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>购物车</span>
+              <span v-if="cartStore.count > 0" class="cart-badge">
+                {{ cartStore.count > 99 ? '99+' : cartStore.count }}
+              </span>
+            </router-link>
             <!-- 卖家中心下拉：登录即可见（店铺入口未入驻也能进去申请） -->
             <el-dropdown v-if="userStore.isLoggedIn" trigger="click">
               <span class="nav-admin">卖家中心 ⌄</span>
@@ -117,9 +141,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from './stores/user'
+import { useCartStore } from './stores/cart'
 import AiPet from './components/AiPet.vue'
 
 const route = useRoute()
@@ -127,6 +152,18 @@ const route = useRoute()
 // logout 里要主动跳转，所以这里必须声明 router。
 const router = useRouter()
 const userStore = useUserStore()
+const cartStore = useCartStore()
+
+/* ---------- 购物车角标 ---------- */
+// 刷新页面后本地只有令牌、没有角标数，需要拉一次；
+// 之后由加购/购物车页的写操作直接 setCount 更新，不再重复请求。
+onMounted(() => cartStore.refresh())
+
+// 登录态变化时同步：登录后拉取真实数量，退出后立刻清零（否则会看到"上一个人的车"）
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => (loggedIn ? cartStore.refresh() : cartStore.reset())
+)
 
 /* ---------- 全局搜索 ---------- */
 const searchKeyword = ref('')
@@ -289,6 +326,30 @@ const handleLogout = () => {
 
 .nav-admin:hover {
   color: var(--ink-900);
+}
+
+/* 购物车入口 + 角标 */
+.nav-cart {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -6px;
+  right: -14px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .nav-login:hover {

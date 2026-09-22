@@ -47,11 +47,19 @@
             <li>已售 <strong>{{ product.sales }}</strong></li>
           </ul>
 
-          <!-- 购物车 / 订单后端尚未实现：按文档要求置灰，不假装能下单 -->
+          <!-- 购物车已接通后端；订单后端尚未实现，仍按文档要求置灰，不假装能下单 -->
           <div class="actions">
-            <button class="btn ghost" disabled title="购物车功能开发中">加入购物车</button>
+            <button
+              class="btn ghost"
+              :disabled="adding || !canBuy"
+              :title="canBuy ? '' : '该商品暂不可购买'"
+              @click="handleAddToCart"
+            >
+              {{ adding ? '加入中…' : '加入购物车' }}
+            </button>
             <button class="btn solid" disabled title="订单功能开发中">立即购买</button>
-            <p class="dev-tip">购物车与订单功能开发中</p>
+            <p v-if="!canBuy" class="dev-tip">该商品已下架或库存不足，无法加入购物车</p>
+            <p v-else class="dev-tip">订单功能开发中</p>
           </div>
         </div>
       </section>
@@ -70,15 +78,55 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getPublicProduct } from '../api/product'
+import { addToCart } from '../api/cart'
+import { useUserStore } from '../stores/user'
+import { useCartStore } from '../stores/cart'
 import { categoryName } from '../constants/category'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+const cartStore = useCartStore()
 
 const loading = ref(false)
 const error = ref('')
 const product = ref(null)
+const adding = ref(false)
+
+/** 可购买 = 商品存在且还有库存。下架商品本就被公开接口过滤掉了，这里主要挡零库存 */
+const canBuy = computed(() => !!product.value && (product.value.stock ?? 0) > 0)
+
+/**
+ * 加入购物车。
+ *
+ * 两步都是「体验层」的提前拦截，真正的判定仍在后端：
+ *  ① 未登录 → 先跳登录页并记住当前地址，登录后回到本页（否则用户会"迷失"）；
+ *  ② 数量固定 +1，想改数量去购物车页 —— 详情页做步进器徒增状态，收益不大。
+ */
+const handleAddToCart = async () => {
+  if (!product.value || adding.value) return
+
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再加入购物车')
+    router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    return
+  }
+
+  adding.value = true
+  try {
+    const cart = await addToCart(product.value.id, 1)
+    // 写接口直接返回整车，顺手把头部角标同步掉，省一次 /cart/count
+    cartStore.setCount(cart?.totalCount)
+    ElMessage.success('已加入购物车')
+  } catch (e) {
+    ElMessage.error(e.message || '加入购物车失败')
+  } finally {
+    adding.value = false
+  }
+}
 
 /** 图集：优先 imageUrls，无则退化到 coverUrl 单图 */
 const galleryList = computed(() => {
@@ -240,20 +288,38 @@ const formatPrice = (v) => (v == null ? '—' : String(v))
   padding: 0 34px;
   border-radius: 999px;
   font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+/* 加入购物车：可用时是描边主按钮，hover 反色 */
+.btn.ghost {
+  border: 1px solid var(--ink-900);
+  background: #fff;
+  color: var(--ink-900);
+}
+
+.btn.ghost:hover:not(:disabled) {
+  background: var(--ink-900);
+  color: #fff;
+}
+
+/* 通用置灰态（零库存 / 请求中） */
+.btn:disabled,
+.btn.ghost:disabled {
+  border-color: var(--ink-300);
+  background: #fff;
+  color: var(--ink-300);
   cursor: not-allowed;
 }
 
-.btn.ghost {
-  border: 1px solid var(--ink-300);
-  background: #fff;
-  color: var(--ink-300);
-}
-
+/* 立即购买：订单后端未实现，刻意保持置灰不可点 —— 不做假按钮 */
 .btn.solid {
   margin-left: 12px;
   border: 1px solid var(--ink-300);
   background: var(--ink-300);
   color: #fff;
+  cursor: not-allowed;
 }
 
 .dev-tip {

@@ -6,6 +6,8 @@
 
 > 🔗 **相关仓库**：后端 [`BIGYYBUG/shop-mall`](https://github.com/BIGYYBUG/shop-mall)（工程目录 `mall-server`，README 在其中）；前端即本仓库 `BIGYYBUG/shop-mall-frontedn`。
 > ⚠️ 本仓库名 `shop-mall-frontedn` 疑似拼写错误（应为 `frontend`），链接以实际地址为准。
+>
+> **当前进度**：首页 / 商品详情 / 登录 / 第三方回调 / 卖家中心 / 管理后台 / **购物车** 均已对接后端；订单尚未实现。
 
 ---
 
@@ -56,6 +58,7 @@ src/
 │  ├─ sellerShop.js 卖家端我的店铺
 │  ├─ adminProduct.js / sellerProduct.js / product.js   商品（三个入口）
 │  ├─ file.js       图片上传
+│  ├─ cart.js       购物车（读 / 加购 / 改量 / 勾选 / 删除 / 清空）
 │  └─ ai.js         AI 对话（多轮会话）
 ├─ components/
 │  ├─ AiPet.vue              悬浮桌宠 AI 助手（全局，见 §6）
@@ -106,6 +109,8 @@ src/
 4. **图片分两层**：提交传 `objectKey`（`coverKey` / `images`），展示用返回的完整 URL（`coverUrl` / `imageUrls`）。**不要把 URL 存下来再提交回去**。
 5. **金额全程字符串**：`price` 是 BigDecimal 序列化结果，禁止浮点运算。
 6. **AI 对话必须回传 `conversationId`**：首轮不带、响应回传、后续原样带回；丢了不是报错，是"模型失忆 + 悄悄多花钱"。
+7. **购物车的写接口都返回「整车」**（`CartVO`，不是 `void`）：拿到后直接整份替换本地状态即可，**不要再发一次 GET**。合计金额一律用返回值里的 `selectedAmount`，不要前端自己乘价格——后端用 `BigDecimal` 算，前端用浮点数算会出现 `0.30000000000000004` 这类结果。
+8. **数量语义要分清**：`POST /cart/items` 是**累加**，`PUT /cart/items/{productId}` 是**设为**指定值。加购用前者、数量框用后者。
 
 ## 6. 特色模块
 
@@ -132,6 +137,18 @@ src/
 ### 商品表单抽屉（`components/ProductFormDrawer.vue`）
 
 卖家端与管理端共用，靠 `mode`（`seller` / `admin`）切换接口组。两处入口权限码不同，**不要合并**，也不要把 admin 接口误用到卖家页。
+
+### 购物车（`views/Cart.vue` + `api/cart.js` + `stores/cart.js`）
+
+前台唯一带结算语义的页面。三个关键设计：
+
+- **所有写操作「一进一出」**：后端每个写接口都返回整车 `CartVO`，`Cart.vue` 的 `run()` 统一收口——成功后整份替换、同步角标数；**失败后重新拉一次**，让界面回到服务端真实状态（例如库存刚被买空）。
+- **`busy` 单飞锁**：数量连点、删除连点会各发一次请求，响应乱序会让界面「跳回旧数量」。加锁后同一时刻只有一个写请求在飞。
+- **失效商品只标记不删除**：下架 / 零库存 / 商品被删的行会带 `available: false` + `invalidReason`，复选框与步进器禁用，且**不计入合计**。失效行永远显示为「未勾选」——后端 `setAllSelected` 会连失效行一起置为选中，前端若照搬会出现「全选后失效商品也被打上勾」的错觉。
+
+角标数放在 `stores/cart.js`，只存**种类数**（与后端 `CartVO.totalCount` 口径一致）。商品详情页加购成功后直接 `setCount(cart.totalCount)`，头部角标立刻变化，**不需要额外请求，也不需要事件总线**。
+
+> ⚠️ 「删除选中」后端目前**没有批量接口**，`Cart.vue` 按顺序逐个调用。购物车规模小（单用户几十行量级）时串行可接受，且串行能让最后一次响应覆盖中间态。上百行后应推进后端补 `DELETE /cart/items/batch`。
 
 ## 7. 设计系统
 
