@@ -7,7 +7,7 @@
 > 🔗 **相关仓库**：后端 [`BIGYYBUG/shop-mall`](https://github.com/BIGYYBUG/shop-mall)（工程目录 `mall-server`，README 在其中）；前端即本仓库 `BIGYYBUG/shop-mall-frontedn`。
 > ⚠️ 本仓库名 `shop-mall-frontedn` 疑似拼写错误（应为 `frontend`），链接以实际地址为准。
 >
-> **当前进度**：首页 / 商品详情 / 登录 / 第三方回调 / 卖家中心 / 管理后台 / **购物车** 均已对接后端；订单尚未实现。
+> **当前进度**：首页 / 商品详情 / 登录 / 第三方回调 / 卖家中心 / 管理后台 / **购物车** 均已对接后端；**订单页尚未开发**（后端订单接口已就绪，见 `docs/sql/10_mall_order.sql` 与后端 README §五）。
 
 ---
 
@@ -173,7 +173,7 @@ src/
 |---|---|
 | 无 `permissions` 下发 | `/user/info` 只给 `roles`，无法按权限码控制按钮，当前按角色控制 |
 | 无分类接口 | `categoryId` 是裸 ID，分类下拉用 `constants/category.js` 的常量兜底 |
-| **订单页缺失** | 后端 `OrderService` 仍是占位；购物车「去结算」与详情页「立即购买」保持置灰，不做假按钮 |
+| **订单页缺失** | 后端订单接口**已实现**（`POST /order/checkout`、`POST /order/buy-now`、`GET /order/list`、`GET /order/{orderNo}`、`POST /order/{orderNo}/pay\|cancel\|confirm`）；缺的是前端页面。购物车「去结算」与详情页「立即购买」仍保持置灰，不做假按钮 |
 | 「记住我」是摆设 | 勾没勾都会把 token 写进 `localStorage`。真要区分得把未勾选时改成 `sessionStorage`，会牵动 `request.js` + `stores/user.js`，暂未动 |
 | 商品 URL ↔ Key | 编辑回显后提交需转换，当前采用"未换图不提交"兜底 |
 | 上传模式 | 当前是后端中转（浏览器→应用→OSS），生产改前端直传后 `api/file.js` 调用方式会变 |
